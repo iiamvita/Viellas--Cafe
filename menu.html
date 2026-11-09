@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu | Viella's Café</title>
+    <meta name="description" content="Explore the menu at Viella's Café. Discover iced coffees, blended drinks and hot favourites. Choose your size and add your drink to your cart.">
+    <!-- CSS -->
+    <link rel="stylesheet" href="../CSS/style.css">
+    <link rel="stylesheet" href="../CSS/menu.css">
+
+</head>
+
+<body>
+
+    <!-- Header -->
+    <div id="header"></div>
+
+    <main>
+
+        <!-- Menu Banner -->
+        <div class="menu-banner">
+            <div>
+                <h1>Our Menu</h1>
+                <p class="breadcrumb">
+                    <a href="index.html">Home</a> / Menu
+                </p>
+            </div>
+
+            <a href="pricing.html" class="menu-banner-link">
+                See all prices
+            </a>
+        </div>
+
+        <!-- Menu Filters -->
+        <div class="menu-filters" id="menu-filters" role="group" aria-label="Filter drinks"></div>
+
+        <!-- Menu Products Grid -->
+        <section class="menu-section">
+            <div class="menu-grid" id="menu-grid"></div>
+        </section>
+
+    </main>
+
+    <!-- Cart Toast Notification -->
+    <div class="menu-toast" id="menu-toast" role="status" aria-live="polite"></div>
+
+    <!-- Footer -->
+    <div id="footer"></div>
+
+    <!-- JavaScript Files -->
+    <script src="db.js"></script>
+    <script src="footer.js"></script>
+    <script src="JS/headerScroll.js"></script>
+
+    <script>
+        /* ---------- Header Loading ---------- */
+       fetch("header.html")
+    .then(response => {
+        if (!response.ok) throw new Error("Header could not be loaded.");
+        return response.text();
+    })
+    .then(data => {
+        document.getElementById("header").innerHTML = data;
+
+        // Initialize header scroll effect and mobile toggle menu
+        if (typeof setupHeaderScroll === "function") setupHeaderScroll();
+        if (typeof setupMobileMenu === "function") setupMobileMenu();
+    })
+    .catch(error => console.error(error));
+
+        /* ---------- Menu Logic ---------- */
+        const grid = document.getElementById("menu-grid");
+        const filterBar = document.getElementById("menu-filters");
+        const toast = document.getElementById("menu-toast");
+
+        const SIZES = ["S", "M", "L"];
+        const SIZE_NAMES = { S: "Small", M: "Medium", L: "Large" };
+
+        let activeFilter = "All";
+        let toastTimer;
+
+        function formatPrice(price) {
+            if (typeof fmt === "function") return fmt(price);
+            return "TT$" + Number(price).toFixed(2);
+        }
+
+        function showToast(message) {
+            toast.innerHTML = `${message} <a href="checkout.html">Checkout</a>`;
+            toast.classList.add("show");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove("show");
+            }, 3500);
+        }
+
+        function buildCard(product) {
+            const card = document.createElement("article");
+            card.className = "menu-card";
+
+            card.innerHTML = `
+                <div class="menu-photo">
+                    <img alt="${product.name}">
+                </div>
+                <div class="menu-body">
+                    <h3></h3>
+                    <p></p>
+                    <div class="menu-sizes" role="group" aria-label="Choose a size"></div>
+                    <div class="menu-buy">
+                        <span class="menu-price"></span>
+                        <button type="button" class="menu-add">Add to cart</button>
+                    </div>
+                </div>
+            `;
+
+            const img = card.querySelector("img");
+            img.src = `images/menu-${product.id}.jpg`;
+            img.addEventListener("error", () => {
+                img.src = "https://via.placeholder.com/400x300?text=Viella's+Café";
+            });
+
+            if (product.seasonal) {
+                const tag = document.createElement("span");
+                tag.className = "menu-tag";
+                tag.textContent = "Seasonal";
+                card.querySelector(".menu-photo").appendChild(tag);
+            }
+
+            card.querySelector("h3").textContent = product.name;
+            card.querySelector("p").textContent = product.description;
+
+            const available = SIZES.filter(size => product.prices && product.prices[size] != null);
+            const sizeBox = card.querySelector(".menu-sizes");
+            const priceEl = card.querySelector(".menu-price");
+            const buttons = [];
+
+            let selected = available.includes("M") ? "M" : available[0];
+
+            function refresh() {
+                buttons.forEach(button => {
+                    button.setAttribute("aria-pressed", String(button.dataset.size === selected));
+                });
+                priceEl.textContent = selected ? formatPrice(product.prices[selected]) : "Price unavailable";
+                card.querySelector(".menu-add").disabled = !selected || typeof Cart === "undefined";
+            }
+
+            SIZES.forEach(size => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "size-btn";
+                button.dataset.size = size;
+                button.textContent = size;
+                button.title = SIZE_NAMES[size];
+
+                if (!available.includes(size)) {
+                    button.disabled = true;
+                }
+
+                button.addEventListener("click", () => {
+                    if (!available.includes(size)) return;
+                    selected = size;
+                    refresh();
+                });
+
+                buttons.push(button);
+                sizeBox.appendChild(button);
+            });
+
+            card.querySelector(".menu-add").addEventListener("click", () => {
+                if (!selected) return;
+                if (typeof Cart === "undefined" || typeof Cart.add !== "function") {
+                    console.error("Cart.add() is not available.");
+                    return;
+                }
+                Cart.add(product.id, selected, 1);
+                showToast(`Added ${product.name} (${selected}) to your cart.`);
+            });
+
+            refresh();
+            return card;
+        }
+
+        function renderGrid() {
+            grid.innerHTML = "";
+            if (typeof DB === "undefined" || typeof DB.get !== "function") {
+                grid.textContent = "Menu products could not be loaded.";
+                return;
+            }
+            const products = DB.get("products") || [];
+            const filteredProducts = products.filter(product =>
+                activeFilter === "All" || product.category === activeFilter
+            );
+
+            if (filteredProducts.length === 0) {
+                grid.textContent = "No drinks found in this category.";
+                return;
+            }
+
+            filteredProducts.forEach(product => grid.appendChild(buildCard(product)));
+        }
+
+        function renderFilters() {
+            if (typeof DB === "undefined" || typeof DB.get !== "function") return;
+            const products = DB.get("products") || [];
+            const categories = ["All", ...new Set(products.map(p => p.category))];
+
+            filterBar.innerHTML = "";
+            categories.forEach(category => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "filter-btn";
+                button.textContent = category;
+                button.setAttribute("aria-pressed", String(category === activeFilter));
+
+                button.addEventListener("click", () => {
+                    activeFilter = category;
+                    renderFilters();
+                    renderGrid();
+                });
+
+                filterBar.appendChild(button);
+            });
+        }
+
+        renderFilters();
+        renderGrid();
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Viella's Café</title>
+    <meta name="description" content="Welcome to Viella's Café. Fall in love with every sip. Discover our artisanal coffees, teas and mouthwatering pastries.">
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css"> 
+    <link rel="stylesheet" href="header.css">
+    <link rel="stylesheet" href="CSS/Root.css">
+
+</head>
+
+
+<main>
+
+    <!-- HOME SECTION -->
+
+    <section class="hero" id="home">
+
+        <div class="hero-content">
+
+            <h1>A Sip of Deliciousness.</h1>
+
+            <p>
+                Welcome to Viella Café, where every cup is
+                thoughtfully crafted, and every visit feels like
+                a warm embrace.
+
+                Discover our menu of artisanal coffees, teas,
+                and mouthwatering pastries.
+
+                Delight in the warmth, cozy ambiance, and the
+                scent of freshly brewed coffee filling the air.
+            </p>
+
+            <a href="#menu" class="btn">Explore Our Menu</a>
+
+        </div>
+
+    </section>
+
+
+    <!-- ABOUT VIELLA'S CAFÉ -->
+
+    <section class="section about" id="about">
+
+        <img src="images/viella-cafe-logo.png"
+             alt="Viella's Café Logo">
+
+        <div class="about-text">
+
+            <h2>About Viella Café</h2>
+
+            <p>
+                At Viella Café, we believe that every cup
+                of coffee tells a story.
+
+                Our passion for quality and craftsmanship
+                is evident in every sip.
+
+                From the carefully selected beans to the
+                expert brewing techniques, we strive to
+                create an unforgettable coffee experience
+                for our customers.
+            </p>
+
+            <p>
+                Whether you're looking for a quiet spot to
+                work, a cozy place to catch up with friends,
+                or simply a moment of indulgence, Viella
+                Café is the perfect destination.
+
+                Join us and discover the art of coffee
+                at its finest.
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- FEATURED DRINKS -->
+<section class="section">
+
+    <div class="section-heading">
+        <h2>Our Favourites</h2>
+        <p>Discover our most popular drinks and treats.</p>
+    </div>
+
+    <div class="drinks-grid">
+
+        <div class="drink-card">
+            <img src="" alt="Iced coffee with whipped cream">
+            <div class="drink-info">
+                <h3>Iced Coffee with Whipped Cream</h3>
+                <p>A refreshing iced coffee topped with a generous swirl of whipped cream.</p>
+            </div>
+        </div>
+
+        <div class="drink-card">
+            <img src="" alt="Blended mocha latte">
+            <div class="drink-info">
+                <h3>Blended Mocha Latte</h3>
+                <p>A smooth, chocolatey blended coffee drink topped with whipped cream.</p>
+            </div>
+        </div>
+
+        <div class="drink-card">
+            <img src="" alt="Midnight mocha">
+            <div class="drink-info">
+                <h3>Midnight Mocha</h3>
+                <p>A rich and indulgent blend of espresso, chocolate, and steamed milk.</p>
+            </div>
+        </div>
+
+        <div class="drink-card">
+            <img src="" alt="Caramel toffee iced coffee">
+            <div class="drink-info">
+                <h3>Caramel Toffee Iced Coffee</h3>
+                <p>A sweet and creamy iced coffee infused with caramel and toffee flavors.</p>
+            </div>
+        </div>
+
+        <div class="drink-card">
+            <img src="" alt="Strawberry swirl">
+            <div class="drink-info">
+                <h3>Strawberry Swirl</h3>
+                <p>A delightful blend of fresh strawberries and creamy milk, perfect for a refreshing treat.</p>
+            </div>
+        </div>
+
+        <div class="drink-card">
+            <img src="" alt="Coconut iced latte">
+            <div class="drink-info">
+                <h3>Coconut Iced Latte</h3>
+                <p>A tropical twist on the classic iced latte, made with coconut milk and a hint of vanilla. Topped with coconut shavings.</p>
+            </div>
+        </div>
+
+    </div>
+
+</section>
+<section class="seasonal">
+    <h2>A Season of Something Special</h2>
+
+    <p>
+        Discover our seasonal creations, featuring unique flavors and limited-time offerings that capture the essence of each season.
+        From our Christmas menu, try our Snowflake Wonderland Hot Chocolate and our Peppermint Hot Chocolate Tea.
+        There's always something new to try at Viella's Café.
+    </p>
+
+    <a href="menu.html" class="btn">Explore Seasonal Specials</a>
+</section>
+</main>

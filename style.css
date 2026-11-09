@@ -1,0 +1,89 @@
+
+/* =====================================
+   VIELLA'S CAFÉ - FULL STYLESHEET
+===================================== */
+
+@import url('Root.css');
+@import url('header.css');
+@import url('hero.css');
+@import url('Home.css');
+@import url('About.css');
+@import url('Featured.css');
+@import url('Menu.css');
+@import url('Pricing.css');
+@import url('Cart.css');
+@import url('Checkout.css');
+@import url('Footer.css');
+@import url('MediaQueries.css');
+@import url('Animations.css');
+
+
+/* ---------- Base Styling ---------- */
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 85px;
+    margin: 0;
+}
+
+body {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--cream);
+    color: var(--espresso);
+    overflow-x: hidden;
+}
+
+
+/* ---------- Typography ---------- */
+
+h1, h2, h3 {
+    font-family: var(--font-h2);
+    color: #68765B;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+button {
+    cursor: pointer;
+    font-family: inherit;
+}
+
+select, input, textarea {
+    font-family: inherit;
+}
+
+
+/* ---------- General Sections ---------- */
+
+.section {
+    padding: 60px 2rem;
+}
+
+.section-heading {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.section-heading h2 {
+    font-size: 36px;
+    margin-bottom: 10px;
+}
+
+.section-heading p {
+    color: var(--grey);
+}
+
+
+/* ---------- Home Page Background ---------- */
+
+#home {
+    background-color: #F7F1E8;
+    color: #39271F;
+h1, h2, h3 {
+    font-family: var(--font-h2);
+    color: #68765B;
+}
